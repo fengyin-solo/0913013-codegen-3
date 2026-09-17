@@ -63,6 +63,29 @@ async def register(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
     return user
 
 
+@router.get("/users")
+async def list_users(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """返回可作为项目成员分配的活跃用户列表（登录用户均可查询，用于成员选择器）。"""
+    users = (
+        db.query(models.User)
+        .filter(models.User.is_active == True)  # noqa: E712
+        .order_by(models.User.id)
+        .all()
+    )
+    return [
+        {
+            "id": u.id,
+            "username": u.username,
+            "email": u.email,
+            "full_name": u.full_name,
+        }
+        for u in users
+    ]
+
+
 @router.get("/me", response_model=schemas.User)
 async def read_current_user(current_user: models.User = Depends(get_current_user)):
     return current_user

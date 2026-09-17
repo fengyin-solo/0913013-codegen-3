@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, ForeignKey, Text, JSON, LargeBinary
+from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, ForeignKey, Text, JSON, LargeBinary, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -32,7 +32,10 @@ class Project(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    members = relationship("ProjectMember", back_populates="project")
+    members = relationship(
+        "ProjectMember", back_populates="project",
+        cascade="all, delete-orphan"
+    )
     seismic_data = relationship("SeismicData", back_populates="project")
     wells = relationship("Well", back_populates="project")
 
@@ -41,7 +44,7 @@ class ProjectMember(Base):
     __tablename__ = "project_members"
 
     id = Column(Integer, primary_key=True, index=True)
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     role = Column(String(20), default="viewer")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -52,6 +55,10 @@ class ProjectMember(Base):
 
 class SeismicData(Base):
     __tablename__ = "seismic_data"
+    __table_args__ = (
+        # 同一项目下数据体名称唯一，是批量转移时判定“目标项目已有同名数据体”的最终依据
+        UniqueConstraint("project_id", "name", name="uq_seismic_data_project_name"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)

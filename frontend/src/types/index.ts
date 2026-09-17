@@ -26,6 +26,71 @@ export interface ProjectMember {
   created_at: string;
 }
 
+export interface AssignableUser {
+  id: number;
+  username: string;
+  email: string;
+  full_name: string | null;
+}
+
+// ---- 批量处理 ----
+
+export interface BatchPreflightBlocker {
+  code: string;
+  message: string;
+}
+
+export interface BatchPreflightResponse {
+  action: 'assign_members' | 'transfer_data';
+  proceed: boolean;
+  blockers: BatchPreflightBlocker[];
+  item_count: number;
+}
+
+export type BatchItemStatus =
+  | 'added'
+  | 'role_updated'
+  | 'already_member'
+  | 'failed'
+  | 'transferred'
+  | 'no_data'
+  | 'partial_transfer'
+  | 'moved'
+  | 'already_at_target';
+
+export interface BatchAssignResult {
+  action: 'assign_members';
+  project_id: number;
+  project_name: string | null;
+  success: boolean;
+  status: 'added' | 'role_updated' | 'already_member' | 'failed';
+  reason?: string | null;
+  reason_code?: string | null;
+  member_id?: number | null;
+}
+
+export interface BatchTransferItem {
+  seismic_data_id: number;
+  name: string;
+  project_id: number;
+  status: 'moved' | 'already_at_target' | 'failed';
+  reason?: string | null;
+  reason_code?: string | null;
+}
+
+export interface BatchTransferResult {
+  action: 'transfer_data';
+  project_id: number;
+  project_name: string | null;
+  success: boolean;
+  status: 'transferred' | 'no_data' | 'partial_transfer' | 'failed';
+  reason?: string | null;
+  reason_code?: string | null;
+  items: BatchTransferItem[];
+  moved_count: number;
+  failed_count: number;
+}
+
 export interface SeismicDataDimensions {
   inline_start: number;
   inline_end: number;

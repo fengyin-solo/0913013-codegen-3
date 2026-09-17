@@ -35,6 +35,7 @@ export const authAPI = {
   register: (data: any) => api.post('/auth/register', data),
   getCurrentUser: () => api.get('/auth/me'),
   updateCurrentUser: (data: any) => api.put('/auth/me', data),
+  listUsers: () => api.get('/auth/users'),
 };
 
 export const projectsAPI = {
@@ -49,6 +50,30 @@ export const projectsAPI = {
     api.put(`/projects/${projectId}/members/${memberId}`, data),
   removeMember: (projectId: number, memberId: number) =>
     api.delete(`/projects/${projectId}/members/${memberId}`),
+  // 批量处理
+  batchPreflight: (data: {
+    action: 'assign_members' | 'transfer_data';
+    project_ids: number[];
+    target_project_id?: number;
+    user_id?: number;
+    role?: string;
+  }) => api.post('/projects/batch/preflight', data),
+  batchAssignMembers: (projectIds: number[], userId: number, role: string) =>
+    api.post('/projects/batch/assign-members', {
+      project_ids: projectIds,
+      user_id: userId,
+      role,
+    }),
+  batchTransferData: (projectIds: number[], targetProjectId: number) =>
+    api.post('/projects/batch/transfer-data', {
+      project_ids: projectIds,
+      target_project_id: targetProjectId,
+    }),
+  batchRetryTransfer: (seismicDataIds: number[], targetProjectId: number) =>
+    api.post('/projects/batch/retry-transfer', {
+      seismic_data_ids: seismicDataIds,
+      target_project_id: targetProjectId,
+    }),
 };
 
 export const seismicAPI = {

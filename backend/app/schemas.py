@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Literal
 from pydantic import BaseModel, EmailStr, Field
 
 
@@ -83,6 +83,82 @@ class ProjectMember(ProjectMemberBase):
 
     class Config:
         from_attributes = True
+
+
+# ---------------------------------------------------------------------------
+# 批量处理（批量分配成员 / 批量转移数据体）
+# ---------------------------------------------------------------------------
+
+BATCH_MAX_ITEMS = 100
+
+
+class BatchPreflightRequest(BaseModel):
+    action: Literal["assign_members", "transfer_data"]
+    project_ids: List[int] = Field(..., min_length=1, max_length=BATCH_MAX_ITEMS)
+    target_project_id: Optional[int] = None
+    user_id: Optional[int] = None
+    role: Optional[str] = None
+
+
+class BatchPreflightBlocker(BaseModel):
+    code: str
+    message: str
+
+
+class BatchPreflightResponse(BaseModel):
+    action: str
+    proceed: bool
+    blockers: List[BatchPreflightBlocker] = []
+    item_count: int = 0
+
+
+class BatchAssignMembersRequest(BaseModel):
+    project_ids: List[int] = Field(..., min_length=1, max_length=BATCH_MAX_ITEMS)
+    user_id: int
+    role: str = "viewer"
+
+
+class BatchTransferDataRequest(BaseModel):
+    project_ids: List[int] = Field(..., min_length=1, max_length=BATCH_MAX_ITEMS)
+    target_project_id: int
+
+
+class BatchTransferItem(BaseModel):
+    seismic_data_id: int
+    name: str
+    status: str  # moved / already_at_target / failed
+    reason: Optional[str] = None
+    reason_code: Optional[str] = None
+    project_id: int
+
+
+class BatchAssignResult(BaseModel):
+    action: Literal["assign_members"]
+    project_id: int
+    project_name: Optional[str] = None
+    success: bool
+    status: str  # added / role_updated / already_member / failed
+    reason: Optional[str] = None
+    reason_code: Optional[str] = None
+    member_id: Optional[int] = None
+
+
+class BatchTransferResult(BaseModel):
+    action: Literal["transfer_data"]
+    project_id: int
+    project_name: Optional[str] = None
+    success: bool
+    status: str  # transferred / no_data / partial_transfer / failed
+    reason: Optional[str] = None
+    reason_code: Optional[str] = None
+    items: List[BatchTransferItem] = []
+    moved_count: int = 0
+    failed_count: int = 0
+
+
+class BatchRetryTransferRequest(BaseModel):
+    target_project_id: int
+    seismic_data_ids: List[int] = Field(..., min_length=1, max_length=BATCH_MAX_ITEMS)
 
 
 class SeismicDataBase(BaseModel):
