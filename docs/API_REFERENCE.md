@@ -144,6 +144,112 @@ password: admin123
 
 **DELETE** `/projects/{project_id}/members/{member_id}`
 
+### 2.10 批量分配协作成员
+
+**POST** `/projects/batch/assign-collaborator`
+
+请求体:
+```json
+{
+  "project_ids": [1, 2, 3],
+  "user_id": 5,
+  "role": "editor"
+}
+```
+
+逐条独立提交，单条失败不影响其他条目；请求中途取消或超时，已成功提交的条目不会回退。
+
+响应 (HTTP 200，逐条结果):
+```json
+{
+  "action": "assign_collaborator",
+  "total": 3,
+  "succeeded": 2,
+  "failed": 1,
+  "results": [
+    {
+      "project_id": 1,
+      "project_name": "工区A",
+      "success": true,
+      "message": "已将成员「zhangsan」以编辑者身份加入项目「工区A」",
+      "error_code": null
+    },
+    {
+      "project_id": 2,
+      "project_name": "工区B",
+      "success": false,
+      "message": "成员「zhangsan」已经是该项目的编辑者，无需重复添加",
+      "error_code": "already_member"
+    }
+  ]
+}
+```
+
+### 2.11 批量转移数据体
+
+**POST** `/projects/batch/transfer-seismic-data`
+
+请求体:
+```json
+{
+  "project_ids": [1, 2, 3],
+  "target_project_id": 9
+}
+```
+
+将每个源项目下的全部地震数据体（`seismic_data`，切片与标注通过外键随之归属新的项目）转入目标项目；井数据保留在原项目。同样逐条独立提交，不回退已完成项。
+
+### 2.12 单条分配协作成员（批量逐条执行/重试使用）
+
+**POST** `/projects/{project_id}/collaborator`
+
+请求体:
+```json
+{ "user_id": 5, "role": "editor" }
+```
+
+成功返回创建的成员记录。失败时 `detail` 为结构化对象：
+```json
+{ "detail": { "error_code": "already_member", "message": "成员「zhangsan」已经是该项目的编辑者，无需重复添加" } }
+```
+
+### 2.13 单条转移数据体（批量逐条执行/重试使用）
+
+**POST** `/projects/{project_id}/seismic-transfer`
+
+请求体:
+```json
+{ "target_project_id": 9 }
+```
+
+成功返回：
+```json
+{ "message": "已将项目「工区A」的 3 个数据体转移到项目「汇总工区」" }
+```
+
+### 批量操作错误码
+
+结构化错误的 `detail.error_code` 取值：
+
+| error_code | HTTP 状态码 | 含义 |
+|------------|-------------|------|
+| `not_found` | 404 | 源项目不存在，提交前已被其他用户删除 |
+| `target_not_found` | 404 | 目标项目不存在，可能已被删除 |
+| `forbidden` | 403 | 当前用户对源项目没有所需权限（分配成员需 owner，转移需 editor） |
+| `target_unavailable` | 400 | 目标项目不可用：对目标项目没有编辑权限，无法转入 |
+| `invalid_target` | 400 | 目标项目与源项目相同 |
+| `duplicate_name` | 409 | 目标项目下存在同名数据体，消息中列出冲突名称，重命名后可重试 |
+| `already_member` | 409 | 该成员已经是项目成员 |
+| `user_not_found` | 404 | 指定的协作成员不存在或已停用 |
+| `invalid_role` | 400 | 角色不合法（仅允许 viewer/editor/owner） |
+| `internal_error` | 500 | 服务器内部错误（批量聚合接口中单条隔离时出现） |
+
+### 2.14 用户列表（选择协作成员）
+
+**GET** `/auth/users`
+
+返回全部活跃用户，用于批量分配协作成员时的成员选择器。
+
 ---
 
 ## 3. 地震数据接口 (Seismic Data)

@@ -32,17 +32,17 @@ class Project(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    members = relationship("ProjectMember", back_populates="project")
-    seismic_data = relationship("SeismicData", back_populates="project")
-    wells = relationship("Well", back_populates="project")
+    members = relationship("ProjectMember", back_populates="project", passive_deletes=True)
+    seismic_data = relationship("SeismicData", back_populates="project", passive_deletes=True)
+    wells = relationship("Well", back_populates="project", passive_deletes=True)
 
 
 class ProjectMember(Base):
     __tablename__ = "project_members"
 
     id = Column(Integer, primary_key=True, index=True)
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     role = Column(String(20), default="viewer")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -54,7 +54,7 @@ class SeismicData(Base):
     __tablename__ = "seismic_data"
 
     id = Column(Integer, primary_key=True, index=True)
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     name = Column(String(200), nullable=False)
     description = Column(Text)
     file_type = Column(String(20), default="segy")
@@ -90,15 +90,15 @@ class SeismicData(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     project = relationship("Project", back_populates="seismic_data")
-    annotations = relationship("Annotation", back_populates="seismic_data")
-    slices = relationship("SeismicSlice", back_populates="seismic_data")
+    annotations = relationship("Annotation", back_populates="seismic_data", passive_deletes=True)
+    slices = relationship("SeismicSlice", back_populates="seismic_data", passive_deletes=True)
 
 
 class SeismicSlice(Base):
     __tablename__ = "seismic_slices"
 
     id = Column(Integer, primary_key=True, index=True)
-    seismic_data_id = Column(Integer, ForeignKey("seismic_data.id"), nullable=False)
+    seismic_data_id = Column(Integer, ForeignKey("seismic_data.id", ondelete="CASCADE"), nullable=False)
     slice_type = Column(String(20), nullable=False)
     slice_index = Column(Integer, nullable=False)
     data_path = Column(String(500))
@@ -114,7 +114,7 @@ class Well(Base):
     __tablename__ = "wells"
 
     id = Column(Integer, primary_key=True, index=True)
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     name = Column(String(100), nullable=False)
     uwi = Column(String(50))
     x = Column(Float)
@@ -124,14 +124,14 @@ class Well(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     project = relationship("Project", back_populates="wells")
-    well_logs = relationship("WellLog", back_populates="well")
+    well_logs = relationship("WellLog", back_populates="well", passive_deletes=True)
 
 
 class WellLog(Base):
     __tablename__ = "well_logs"
 
     id = Column(Integer, primary_key=True, index=True)
-    well_id = Column(Integer, ForeignKey("wells.id"), nullable=False)
+    well_id = Column(Integer, ForeignKey("wells.id", ondelete="CASCADE"), nullable=False)
     log_name = Column(String(50), nullable=False)
     log_type = Column(String(50))
     unit = Column(String(20))
@@ -148,8 +148,8 @@ class Annotation(Base):
     __tablename__ = "annotations"
 
     id = Column(Integer, primary_key=True, index=True)
-    seismic_data_id = Column(Integer, ForeignKey("seismic_data.id"), nullable=False)
-    owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    seismic_data_id = Column(Integer, ForeignKey("seismic_data.id", ondelete="CASCADE"), nullable=False)
+    owner_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     name = Column(String(200))
     annotation_type = Column(String(50), nullable=False)
     geometry = Column(JSON)
@@ -166,7 +166,7 @@ class DataProcessingTask(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     task_type = Column(String(50), nullable=False)
-    seismic_data_id = Column(Integer, ForeignKey("seismic_data.id"))
+    seismic_data_id = Column(Integer, ForeignKey("seismic_data.id", ondelete="SET NULL"))
     status = Column(String(20), default="pending")
     progress = Column(Float, default=0.0)
     parameters = Column(JSON)

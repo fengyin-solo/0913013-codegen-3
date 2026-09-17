@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { BackendErrorDetail } from '../types';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1';
 
@@ -6,6 +7,47 @@ const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 300000,
 });
+
+export interface ParsedApiError {
+  errorCode: string;
+  message: string;
+  status?: number;
+}
+
+/**
+ * 统一解析后端错误。批量相关接口返回
+ * { detail: { error_code, message } }，旧接口仍是 { detail: "..." }。
+ */
+export function parseApiError(error: any): ParsedApiError {
+  const status = error?.response?.status;
+  const detail = error?.response?.data?.detail;
+  let errorCode = 'error';
+  let message: string;
+
+  if (detail && typeof detail === 'object') {
+    const d = detail as BackendErrorDetail;
+    errorCode = d.error_code || 'error';
+    message = d.message || '操作失败';
+  } else if (typeof detail === 'string' && detail) {
+    message = detail;
+    errorCode = mapStatusToCode(status, detail);
+  } else if (error?.code === 'ERR_CANCELED') {
+    errorCode = 'canceled';
+    message = '请求已取消';
+  } else {
+    message = error?.message || '网络异常，请稍后重试';
+  }
+
+  return { errorCode, message, status };
+}
+
+function mapStatusToCode(status?: number, detail?: string): string {
+  if (status === 404) return 'not_found';
+  if (status === 403) return 'forbidden';
+  if (status === 409) return 'already_member';
+  if (status === 400 && detail && detail.includes('目标项目')) return 'target_unavailable';
+  return 'error';
+}
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
@@ -18,7 +60,7 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && error.code !== 'ERR_CANCELED') {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';
@@ -35,6 +77,7 @@ export const authAPI = {
   register: (data: any) => api.post('/auth/register', data),
   getCurrentUser: () => api.get('/auth/me'),
   updateCurrentUser: (data: any) => api.put('/auth/me', data),
+  listUsers: () => api.get('/auth/users'),
 };
 
 export const projectsAPI = {
@@ -49,6 +92,19 @@ export const projectsAPI = {
     api.put(`/projects/${projectId}/members/${memberId}`, data),
   removeMember: (projectId: number, memberId: number) =>
     api.delete(`/projects/${projectId}/members/${memberId}`),
+  // 单条操作，供批量逐条执行与失败重试
+  assignCollaborator: (projectId: number, data: { user_id: number; role: string }) =>
+    api.post(`/projects/${projectId}/collaborator`, data),
+  transferSeismicData: (projectId: number, targetProjectId: number) =>
+    api.post(`/projects/${projectId}/seismic-transfer`, { target_project_id: targetProjectId }),
+  // 整批聚合接口（一次性返回逐条结果；逐条独立提交）
+  batchAssignCollaborator: (projectIds: number[], userId: number, role: string) =>
+    api.post('/projects/batch/assign-collaborator', { project_ids: projectIds, user_id: userId, role }),
+  batchTransferSeismicData: (projectIds: number[], targetProjectId: number) =>
+    api.post('/projects/batch/transfer-seismic-data', {
+      project_ids: projectIds,
+      target_project_id: targetProjectId,
+    }),
 };
 
 export const seismicAPI = {

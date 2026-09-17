@@ -85,6 +85,43 @@ class ProjectMember(ProjectMemberBase):
         from_attributes = True
 
 
+class ProjectCollaboratorAssign(BaseModel):
+    user_id: int
+    role: str = "editor"
+
+
+class SeismicDataTransfer(BaseModel):
+    target_project_id: int
+
+
+class BatchAssignCollaborator(BaseModel):
+    project_ids: List[int]
+    user_id: int
+    role: str = "editor"
+
+
+class BatchTransferSeismicData(BaseModel):
+    project_ids: List[int]
+    target_project_id: int
+
+
+class BatchItemResult(BaseModel):
+    """批量操作中单条项目的处理结果。"""
+    project_id: int
+    project_name: Optional[str] = None
+    success: bool
+    message: str
+    error_code: Optional[str] = None
+
+
+class BatchActionResponse(BaseModel):
+    action: str
+    total: int
+    succeeded: int
+    failed: int
+    results: List[BatchItemResult]
+
+
 class SeismicDataBase(BaseModel):
     name: str
     description: Optional[str] = None

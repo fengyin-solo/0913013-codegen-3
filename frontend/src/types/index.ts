@@ -26,6 +26,33 @@ export interface ProjectMember {
   created_at: string;
 }
 
+export type BatchItemStatus = 'pending' | 'processing' | 'success' | 'failed' | 'cancelled';
+
+export interface BatchItemResult {
+  project_id: number;
+  project_name?: string | null;
+  success: boolean;
+  message: string;
+  error_code?: string | null;
+  /** 前端逐条执行时的本地状态（服务端不返回） */
+  status?: BatchItemStatus;
+}
+
+export interface BatchActionResponse {
+  action: string;
+  total: number;
+  succeeded: number;
+  failed: number;
+  results: BatchItemResult[];
+}
+
+export interface BackendErrorDetail {
+  error_code?: string;
+  message?: string;
+}
+
+export type BatchActionType = 'assign_collaborator' | 'transfer_seismic_data';
+
 export interface SeismicDataDimensions {
   inline_start: number;
   inline_end: number;

@@ -14,6 +14,7 @@ import {
   Upload,
   Progress,
   Empty,
+  Alert,
 } from 'antd';
 import {
   PlusOutlined,
@@ -22,6 +23,8 @@ import {
   EyeOutlined,
   UploadOutlined,
   DatabaseOutlined,
+  TeamOutlined,
+  SwapOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
@@ -30,19 +33,26 @@ import {
   createProject,
   updateProject,
   deleteProject,
-  setCurrentProject,
 } from '../store/slices/projectSlice';
 import { fetchSeismicData, uploadSeismicData, setCurrentSeismic } from '../store/slices/seismicSlice';
 import { RootState, AppDispatch } from '../store';
-import { Project, SeismicData } from '../types';
+import { Project, SeismicData, User } from '../types';
+import { authAPI } from '../services/api';
+import BatchOperationModal from '../components/BatchOperationModal';
 
 const { Title, Text } = Typography;
+
+type BatchAction = 'assign_collaborator' | 'transfer_seismic_data';
 
 const Projects: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+  const [batchAction, setBatchAction] = useState<BatchAction | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
   const [form] = Form.useForm();
   const [uploadForm] = Form.useForm();
   const navigate = useNavigate();
@@ -55,6 +65,45 @@ const Projects: React.FC = () => {
     dispatch(fetchProjects());
   }, [dispatch]);
 
+  const selectedProjects = projects.filter((p) => selectedRowKeys.includes(p.id));
+
+  const loadUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const res = await authAPI.listUsers();
+      setUsers(res.data);
+    } catch {
+      message.error('获取成员列表失败，请稍后重试');
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  const openBatchAction = (action: BatchAction) => {
+    if (selectedRowKeys.length === 0) {
+      message.warning('请先勾选要处理的项目');
+      return;
+    }
+    if (action === 'assign_collaborator' && users.length === 0) {
+      loadUsers();
+    }
+    setBatchAction(action);
+  };
+
+  const closeBatchModal = () => {
+    setBatchAction(null);
+    // 关闭即结束本次批量上下文，清空勾选
+    setSelectedRowKeys([]);
+  };
+
+  const handleBatchCompleted = () => {
+    // 归属可能已变化（成员关系、数据体归属），重新拉取项目列表；
+    // 若数据管理弹窗开着，同步刷新当前项目的数据体列表
+    dispatch(fetchProjects());
+    if (selectedProject) {
+      dispatch(fetchSeismicData(selectedProject.id));
+    }
+  };
   const handleCreate = () => {
     setEditingProject(null);
     form.resetFields();
@@ -255,14 +304,60 @@ const Projects: React.FC = () => {
           </Button>
         }
       >
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="勾选项目后可批量处理"
+          description={
+            <Space wrap>
+          <Button
+            icon={<TeamOutlined />}
+            disabled={selectedRowKeys.length === 0}
+            onClick={() => openBatchAction('assign_collaborator')}
+          >
+            批量分配协作成员
+          </Button>
+          <Button
+            icon={<SwapOutlined />}
+            disabled={selectedRowKeys.length === 0}
+            onClick={() => openBatchAction('transfer_seismic_data')}
+          >
+            批量转移数据体
+          </Button>
+          {selectedRowKeys.length > 0 && (
+            <Text type="secondary">已选 {selectedRowKeys.length} 个项目（逐条独立执行，失败可单独重试）</Text>
+          )}
+            </Space>
+          }
+        />
         <Table
           columns={projectColumns}
           dataSource={projects}
           rowKey="id"
           loading={loading}
+          rowSelection={{
+            selectedRowKeys,
+            onChange: setSelectedRowKeys,
+            preserveSelectedRowKeys: false,
+          }}
           pagination={{ pageSize: 10 }}
         />
       </Card>
+
+      {batchAction && (
+        <BatchOperationModal
+          key={batchAction}
+          open={!!batchAction}
+          action={batchAction}
+          projects={selectedProjects}
+          allProjects={projects}
+          users={users}
+          loadingUsers={loadingUsers}
+          onClose={closeBatchModal}
+          onCompleted={handleBatchCompleted}
+        />
+      )}
 
       <Modal
         title={editingProject ? '编辑项目' : '新建项目'}

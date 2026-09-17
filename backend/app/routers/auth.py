@@ -1,4 +1,5 @@
 from datetime import timedelta
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -66,6 +67,16 @@ async def register(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
 @router.get("/me", response_model=schemas.User)
 async def read_current_user(current_user: models.User = Depends(get_current_user)):
     return current_user
+
+
+@router.get("/users", response_model=List[schemas.User])
+async def list_users(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """列出可被添加为项目协作者的活跃用户。"""
+    users = db.query(models.User).filter(models.User.is_active == True).all()
+    return users
 
 
 @router.put("/me", response_model=schemas.User)

@@ -280,6 +280,20 @@ users ─────┐
 
 ## 数据库优化建议
 
+### 外键与级联策略
+
+| 子表 | 外键 | 删除父记录时 |
+|------|------|--------------|
+| project_members | project_id → projects.id, user_id → users.id | `ON DELETE CASCADE` |
+| seismic_data | project_id → projects.id | `ON DELETE CASCADE` |
+| seismic_slices | seismic_data_id → seismic_data.id | `ON DELETE CASCADE` |
+| wells | project_id → projects.id | `ON DELETE CASCADE` |
+| well_logs | well_id → wells.id | `ON DELETE CASCADE` |
+| annotations | seismic_data_id → seismic_data.id, owner_id → users.id | `ON DELETE CASCADE` |
+| processing_tasks | seismic_data_id → seismic_data.id | `ON DELETE SET NULL` |
+
+数据体批量转移只更新 `seismic_data.project_id`（数据体的 id 不变），因此 `seismic_slices`、`annotations` 等下游记录无需改动，归属自动随数据体变更。
+
 ### 索引策略
 1. 所有外键字段创建索引
 2. 频繁查询的组合字段创建复合索引
